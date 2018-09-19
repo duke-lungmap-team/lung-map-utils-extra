@@ -2,6 +2,8 @@ import cv2
 import numpy as np
 import operator
 from scipy import optimize
+from skimage.segmentation import slic
+import matplotlib.pyplot as plt
 
 
 def fill_holes(mask):
@@ -245,3 +247,75 @@ def find_contour_union(contour_list, img_shape):
         union_mask = cv2.bitwise_or(union_mask, c_mask)
 
     return union_mask
+
+
+def generate_background_contours(
+        hsv_img,
+        non_bg_contours,
+        remove_border_contours=True,
+        plot=False
+):
+    img = cv2.cvtColor(hsv_img, cv2.COLOR_HSV2RGB)
+    non_bg_mask = np.zeros((img.shape[0], img.shape[1]), dtype=np.uint8)
+    cv2.drawContours(non_bg_mask, non_bg_contours, -1, 255, cv2.FILLED)
+
+    bg_mask_img = cv2.bitwise_and(img, img, mask=~non_bg_mask)
+
+    segments = slic(
+        bg_mask_img,
+        n_segments=200,  # TODO: need to calculate this instead of hard-coding
+        compactness=100,
+        sigma=1,
+        enforce_connectivity=True
+    )
+
+    masked_segments = cv2.bitwise_and(segments, segments, mask=~non_bg_mask)
+
+    all_contours = []
+
+    for label in np.unique(masked_segments):
+        if label == 0:
+            continue
+
+        mask = masked_segments == label
+        mask.dtype = np.uint8
+        mask[mask == 1] = 255
+        mask = cv2.erode(mask, np.ones((3, 3), np.uint8), iterations=3)
+
+        new_mask, contours, hierarchy = cv2.findContours(
+            mask,
+            cv2.RETR_CCOMP,
+            cv2.CHAIN_APPROX_SIMPLE
+        )
+
+        all_contours.extend(contours)
+
+    bkgd_contour_mask = np.zeros((img.shape[0], img.shape[1]), dtype=np.uint8)
+    cv2.drawContours(bkgd_contour_mask, all_contours, -1, 255, -1)
+
+    all_contours = filter_contours_by_size(
+        bkgd_contour_mask, min_size=64 * 64,
+        max_size=1000 * 1000
+    )
+
+    if remove_border_contours:
+        border_contours, all_contours = find_border_contours(
+            all_contours,
+            img.shape[0],
+            img.shape[1]
+        )
+
+    if plot:
+        bkgd_contour_mask = np.zeros((img.shape[0], img.shape[1]), dtype=np.uint8)
+        cv2.drawContours(bkgd_contour_mask, all_contours, -1, 255, -1)
+
+        fig = plt.figure(figsize=(16, 16))
+        plt.imshow(cv2.cvtColor(bkgd_contour_mask, cv2.COLOR_GRAY2RGB))
+
+        bg_mask_img = cv2.bitwise_and(img, img, mask=bkgd_contour_mask)
+        fig = plt.figure(figsize=(16, 16))
+        plt.imshow(bg_mask_img)
+
+        plt.show()
+
+    return all_contours
