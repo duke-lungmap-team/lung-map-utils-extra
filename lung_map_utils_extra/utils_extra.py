@@ -34,7 +34,7 @@ def filter_contours_by_size(mask, min_size=1024, max_size=None):
     )
 
     if max_size is None:
-        max_size = int(mask.shape[0] * mask.shape[1] * 0.20)
+        max_size = int(mask.shape[0] * mask.shape[1] * 0.50)
     min_size = min_size
 
     good_contours = []
@@ -218,22 +218,15 @@ def fill_border_contour(contour, img_shape):
 
     # now to convert our perimeter location back to an image coordinate
     if flood_fill_entry_point < img_w:
-        print('top')
         flood_fill_entry_coords = (flood_fill_entry_point, 0)
     elif flood_fill_entry_point < img_w + img_h:
-        print('right')
         flood_fill_entry_coords = (img_w - 1, flood_fill_entry_point - img_w + 1)
     elif flood_fill_entry_point < img_w * 2 + img_h:
-        print('bottom')
         flood_fill_entry_coords = (img_h + (2 * img_w) - 3 - flood_fill_entry_point, img_h - 1)
     else:
-        print('left')
         flood_fill_entry_coords = (0, perimeter - flood_fill_entry_point)
 
     flood_fill_mask = np.zeros((mask.shape[0] + 2, mask.shape[1] + 2), dtype=np.uint8)
-
-    print(flood_fill_entry_point)
-    print(flood_fill_entry_coords)
 
     # noinspection PyUnresolvedReferences
     cv2.floodFill(mask, flood_fill_mask, tuple(flood_fill_entry_coords), 255)
