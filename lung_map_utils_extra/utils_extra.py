@@ -319,3 +319,107 @@ def generate_background_contours(
         plt.show()
 
     return all_contours
+
+
+def elongate_contour(contour, img_shape, extend_length):
+    c_mask = np.zeros(img_shape, dtype=np.uint8)
+
+    cv2.drawContours(c_mask, [contour], -1, 255, -1)
+
+    rect = cv2.minAreaRect(contour)
+    box = box = cv2.boxPoints(rect)
+
+    cx, cy = rect[0]
+    w, h = rect[1]
+    angle = rect[2]
+
+    if w <= 1 or h <= 1 or extend_length < 0:
+        return contour
+
+    if isinstance(extend_length, float) and extend_length <= 1.0:
+        extend_length = int(extend_length * max(w, h)) + 1
+
+    if w > h:
+        angle = angle - 90
+
+    mat = cv2.getRotationMatrix2D((cx, cy), angle, 1.0)
+    c_mask_rot = cv2.warpAffine(c_mask, mat, img_shape)
+    c_mask_rot[c_mask_rot > 0] = 255
+
+    y_locs = np.where(c_mask_rot > 0)[0]
+    y_min = y_locs.min()
+    y_max = y_locs.max()
+    y_mid = int(np.round(np.average([y_min, y_max])))
+
+    top_x_locs = np.where(c_mask_rot[y_min + 1, :] > 0)[0]
+    mid_x_locs = np.where(c_mask_rot[y_mid, :] > 0)[0]
+    bottom_x_locs = np.where(c_mask_rot[y_max - 1, :] > 0)[0]
+
+    mid_x_min = mid_x_locs.min()
+    mid_x_max = mid_x_locs.max()
+    mid_x_mid = int(np.round(np.average([mid_x_min, mid_x_max])))
+    mid_width = mid_x_max - mid_x_min
+
+    if len(top_x_locs) > 0:
+        top_x_min = top_x_locs.min()
+        top_x_max = top_x_locs.max()
+        top_x_mid = int(np.round(np.average([top_x_min, top_x_max])))
+        extend_top = True
+    else:
+        extend_top = False
+
+    if len(bottom_x_locs) > 0:
+        bottom_x_min = bottom_x_locs.min()
+        bottom_x_max = bottom_x_locs.max()
+        bottom_x_mid = int(np.round(np.average([bottom_x_min, bottom_x_max])))
+        extend_bottom = True
+    else:
+        extend_bottom = False
+
+    mid_coord = (mid_x_mid, y_mid)
+    new_c_mask_rot = c_mask_rot.copy()
+
+    if extend_top:
+        top_coord = (top_x_mid, y_min)
+
+        top_angle = np.math.atan2(top_coord[1] - mid_coord[1], top_coord[0] - mid_coord[0])
+        top_angle = top_angle * 180 / np.pi
+
+        cv2.ellipse(
+            new_c_mask_rot,
+            top_coord,
+            (extend_length, int(mid_width / 4)),
+            top_angle,
+            0,
+            360,
+            255,
+            -1
+        )
+
+    if extend_bottom:
+        bottom_coord = (bottom_x_mid, y_max)
+
+        bottom_angle = np.math.atan2(bottom_coord[1] - mid_coord[1],
+                                     bottom_coord[0] - mid_coord[0])
+        bottom_angle = bottom_angle * 180 / np.pi
+
+        cv2.ellipse(
+            new_c_mask_rot,
+            bottom_coord,
+            (extend_length, int(mid_width / 4)),
+            bottom_angle,
+            0,
+            360,
+            255,
+            -1
+        )
+
+    inv_mat = cv2.getRotationMatrix2D((cx, cy), -angle, 1.0)
+    c_mask_new = cv2.warpAffine(new_c_mask_rot, inv_mat, img_shape)
+    # fix interpolation artifacts
+    c_mask_new[c_mask_new > 0] = 255
+
+    _, contours, hierarchy = cv2.findContours(c_mask_new.copy(), cv2.RETR_EXTERNAL,
+                                              cv2.CHAIN_APPROX_SIMPLE)
+
+    return contours[0]
