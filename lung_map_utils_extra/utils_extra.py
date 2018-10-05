@@ -1,9 +1,18 @@
-import cv2
 import numpy as np
 import operator
 from scipy import optimize
 from skimage.segmentation import slic
 import matplotlib.pyplot as plt
+
+# weird import style to un-confuse PyCharm
+try:
+    from cv2 import cv2
+except ImportError:
+    import cv2
+
+ellipse_strel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+ellipse90_strel = np.rot90(ellipse_strel)
+circle_strel = np.bitwise_or(ellipse_strel, ellipse90_strel)
 
 
 def fill_holes(mask):
@@ -31,7 +40,7 @@ def filter_contours_by_size(mask, min_size=1024, max_size=None):
     # noinspection PyUnresolvedReferences
     new_mask, contours, hierarchy = cv2.findContours(
         thresh,
-        cv2.RETR_CCOMP,
+        cv2.RETR_EXTERNAL,
         cv2.CHAIN_APPROX_SIMPLE
     )
 
@@ -68,7 +77,10 @@ def error_function(p, x, y):
 
 
 def determine_hist_mode(sat_channel):
-    cnt, bins = np.histogram(sat_channel.flatten(), bins=256, range=(0, 256))
+    if len(sat_channel) > 1:
+        sat_channel = sat_channel.flatten()
+
+    cnt, bins = np.histogram(sat_channel, bins=256, range=(0, 256))
 
     maximas = {}
 
@@ -90,7 +102,7 @@ def determine_hist_mode(sat_channel):
 
     optim, success = optimize.leastsq(error_function, guess[:], args=(bins[:-1], cnt))
 
-    min_height = int(sat_channel.shape[0] * sat_channel.shape[1] * 0.01)
+    min_height = int(sat_channel.shape[0] * 0.01)
 
     if optim[2] >= optim[-1] and optim[0] > min_height:
         center = optim[1],
@@ -236,6 +248,58 @@ def fill_border_contour(contour, img_shape):
     return mask
 
 
+def find_border_by_mask(
+        signal_mask,
+        contour_mask,
+        max_dilate_percentage=0.2,
+        dilate_iterations=1
+):
+    area = np.sum(contour_mask > 0)
+    max_dilation_area = area + int(max_dilate_percentage * area)
+
+    # create a baseline from the original border
+    filled_c_mask_erode = cv2.erode(
+        contour_mask,
+        circle_strel,
+        iterations=dilate_iterations
+    )
+    border_mask = contour_mask - filled_c_mask_erode
+    border_signal_mask = np.bitwise_and(border_mask, signal_mask)
+
+    max_mask = contour_mask.copy()
+    max_signal = np.sum(border_signal_mask > 0) / np.sum(border_mask > 0)
+    orig = True
+
+    filled_c_mask_dilate = contour_mask.copy()
+
+    count = 0
+
+    while area < max_dilation_area:
+        count += 1
+
+        last_mask = filled_c_mask_dilate.copy()
+        filled_c_mask_dilate = cv2.dilate(
+            last_mask,
+            circle_strel,
+            iterations=dilate_iterations
+        )
+        area = np.sum(filled_c_mask_dilate > 0)
+        border_mask = filled_c_mask_dilate - last_mask
+        border_signal_mask = np.bitwise_and(border_mask, signal_mask)
+
+        new_signal = np.sum(border_signal_mask > 0) / np.sum(border_mask > 0)
+
+        if max_signal > 0 and new_signal == 0 and count > 5:
+            break
+
+        if new_signal >= max_signal:
+            max_signal = new_signal
+            max_mask = filled_c_mask_dilate.copy()
+            orig = False
+
+    return max_mask, max_signal, orig
+
+
 def find_contour_union(contour_list, img_shape):
     union_mask = np.zeros(img_shape, dtype=np.uint8)
 
@@ -309,11 +373,11 @@ def generate_background_contours(
         bkgd_contour_mask = np.zeros((img.shape[0], img.shape[1]), dtype=np.uint8)
         cv2.drawContours(bkgd_contour_mask, all_contours, -1, 255, -1)
 
-        fig = plt.figure(figsize=(16, 16))
+        plt.figure(figsize=(16, 16))
         plt.imshow(cv2.cvtColor(bkgd_contour_mask, cv2.COLOR_GRAY2RGB))
 
         bg_mask_img = cv2.bitwise_and(img, img, mask=bkgd_contour_mask)
-        fig = plt.figure(figsize=(16, 16))
+        plt.figure(figsize=(16, 16))
         plt.imshow(bg_mask_img)
 
         plt.show()
@@ -327,7 +391,6 @@ def elongate_contour(contour, img_shape, extend_length):
     cv2.drawContours(c_mask, [contour], -1, 255, -1)
 
     rect = cv2.minAreaRect(contour)
-    box = box = cv2.boxPoints(rect)
 
     cx, cy = rect[0]
     w, h = rect[1]
