@@ -19,25 +19,20 @@ def fill_holes(mask):
     """
     Fills holes in a given binary mask.
     """
-    # noinspection PyUnresolvedReferences
     ret, thresh = cv2.threshold(mask, 1, 255, cv2.THRESH_BINARY)
-    # noinspection PyUnresolvedReferences
     new_mask, contours, hierarchy = cv2.findContours(
         thresh,
         cv2.RETR_CCOMP,
         cv2.CHAIN_APPROX_SIMPLE
     )
     for cnt in contours:
-        # noinspection PyUnresolvedReferences
         cv2.drawContours(new_mask, [cnt], 0, 255, -1)
 
     return new_mask
 
 
 def filter_contours_by_size(mask, min_size=1024, max_size=None):
-    # noinspection PyUnresolvedReferences
     ret, thresh = cv2.threshold(mask, 1, 255, cv2.THRESH_BINARY)
-    # noinspection PyUnresolvedReferences
     new_mask, contours, hierarchy = cv2.findContours(
         thresh,
         cv2.RETR_EXTERNAL,
@@ -51,7 +46,6 @@ def filter_contours_by_size(mask, min_size=1024, max_size=None):
     good_contours = []
 
     for c in contours:
-        # noinspection PyUnresolvedReferences
         rect = cv2.boundingRect(c)
         rect_area = rect[2] * rect[3]
 
@@ -147,7 +141,6 @@ def find_border_contours(contours, img_h, img_w):
     non_border_contours = []
 
     for c in contours:
-        # noinspection PyUnresolvedReferences
         rect = cv2.boundingRect(c)
 
         c_min_x = rect[0]
@@ -168,7 +161,6 @@ def find_border_contours(contours, img_h, img_w):
 
 def fill_border_contour(contour, img_shape):
     mask = np.zeros(img_shape, dtype=np.uint8)
-    # noinspection PyUnresolvedReferences
     cv2.drawContours(mask, [contour], 0, 255, cv2.FILLED)
 
     # Extract the perimeter pixels, leaving out the last pixel
@@ -242,7 +234,6 @@ def fill_border_contour(contour, img_shape):
 
     flood_fill_mask = np.zeros((mask.shape[0] + 2, mask.shape[1] + 2), dtype=np.uint8)
 
-    # noinspection PyUnresolvedReferences
     cv2.floodFill(mask, flood_fill_mask, tuple(flood_fill_entry_coords), 255)
 
     return mask
@@ -305,9 +296,7 @@ def find_contour_union(contour_list, img_shape):
 
     for c in contour_list:
         c_mask = np.zeros(img_shape, dtype=np.uint8)
-        # noinspection PyUnresolvedReferences
         cv2.drawContours(c_mask, [c], 0, 255, cv2.FILLED)
-        # noinspection PyUnresolvedReferences
         union_mask = cv2.bitwise_or(union_mask, c_mask)
 
     return union_mask
@@ -479,6 +468,7 @@ def elongate_contour(contour, img_shape, extend_length):
 
     inv_mat = cv2.getRotationMatrix2D((cx, cy), -angle, 1.0)
     c_mask_new = cv2.warpAffine(new_c_mask_rot, inv_mat, img_shape)
+
     # fix interpolation artifacts
     c_mask_new[c_mask_new > 0] = 255
 

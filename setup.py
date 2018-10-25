@@ -1,13 +1,13 @@
 from setuptools import setup
 
 setup(
-    name='LungMapUtilsExtra',
-    version='1.2',
-    packages=['lung_map_utils_extra'],
+    name='cv2x',
+    version='0.1',
+    packages=['cv2_extras'],
     license='BSD 2-Clause License',
     long_description=open('README.md').read(),
-    author='Duke Lungmap Team',
-    description='Extra functions for image processing tasks for LungMap analysis',
+    author='Scott White',
+    description='A Python library for higher level OpenCV functions used in image analysis and computer vision',
     install_requires=[
         'numpy',
         'opencv-python',
