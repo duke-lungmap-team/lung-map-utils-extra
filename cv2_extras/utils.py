@@ -55,26 +55,26 @@ def filter_contours_by_size(mask, min_size=1024, max_size=None):
     return good_contours
 
 
-def gaussian(x, height, center, width):
+def _gaussian(x, height, center, width):
     return height * np.exp(-(x - center) ** 2 / (2 * width ** 2))
 
 
-def two_gaussian(x, h1, c1, w1, h2, c2, w2):
+def _two_gaussian(x, h1, c1, w1, h2, c2, w2):
     return (
-        gaussian(x, h1, c1, w1) +
-        gaussian(x, h2, c2, w2)
+            _gaussian(x, h1, c1, w1) +
+            _gaussian(x, h2, c2, w2)
     )
 
 
-def error_function(p, x, y):
-    return (two_gaussian(x, *p) - y) ** 2
+def _error_function(p, x, y):
+    return (_two_gaussian(x, *p) - y) ** 2
 
 
-def determine_hist_mode(sat_channel):
-    if len(sat_channel) > 1:
-        sat_channel = sat_channel.flatten()
+def determine_channel_mode(channel):
+    if len(channel) > 1:
+        channel = channel.flatten()
 
-    cnt, bins = np.histogram(sat_channel, bins=256, range=(0, 256))
+    cnt, bins = np.histogram(channel, bins=256, range=(0, 256))
 
     maximas = {}
 
@@ -94,9 +94,9 @@ def determine_hist_mode(sat_channel):
     for m in maximas:
         guess.extend([m[1], m[0], 10])
 
-    optim, success = optimize.leastsq(error_function, guess[:], args=(bins[:-1], cnt))
+    optim, success = optimize.leastsq(_error_function, guess[:], args=(bins[:-1], cnt))
 
-    min_height = int(sat_channel.shape[0] * 0.01)
+    min_height = int(channel.shape[0] * 0.01)
 
     if optim[2] >= optim[-1] and optim[0] > min_height:
         center = optim[1],
