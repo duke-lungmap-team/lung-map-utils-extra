@@ -1,8 +1,8 @@
 from setuptools import setup
 
 setup(
-    name='cv2x',
-    version='0.1',
+    name='cv2_extras',
+    version='0.2',
     packages=['cv2_extras'],
     license='BSD 2-Clause License',
     long_description=open('README.md').read(),

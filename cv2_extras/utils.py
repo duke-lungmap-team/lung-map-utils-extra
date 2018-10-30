@@ -1,5 +1,4 @@
 import numpy as np
-import operator
 from scipy import optimize
 from skimage.segmentation import slic
 import matplotlib.pyplot as plt
@@ -53,62 +52,6 @@ def filter_contours_by_size(mask, min_size=1024, max_size=None):
             good_contours.append(c)
 
     return good_contours
-
-
-def _gaussian(x, height, center, width):
-    return height * np.exp(-(x - center) ** 2 / (2 * width ** 2))
-
-
-def _two_gaussian(x, h1, c1, w1, h2, c2, w2):
-    return (
-            _gaussian(x, h1, c1, w1) +
-            _gaussian(x, h2, c2, w2)
-    )
-
-
-def _error_function(p, x, y):
-    return (_two_gaussian(x, *p) - y) ** 2
-
-
-def determine_channel_mode(channel):
-    if len(channel) > 1:
-        channel = channel.flatten()
-
-    cnt, bins = np.histogram(channel, bins=256, range=(0, 256))
-
-    maximas = {}
-
-    for i, c in enumerate(cnt[:-1]):
-        if cnt[i + 1] < c:
-            maximas[i] = c
-
-    maximas = sorted(maximas.items(), key=operator.itemgetter(1))
-
-    if len(maximas) > 1:
-        maximas = maximas[-2:]
-    else:
-        return None
-
-    guess = []
-
-    for m in maximas:
-        guess.extend([m[1], m[0], 10])
-
-    optim, success = optimize.leastsq(_error_function, guess[:], args=(bins[:-1], cnt))
-
-    min_height = int(channel.shape[0] * 0.01)
-
-    if optim[2] >= optim[-1] and optim[0] > min_height:
-        center = optim[1],
-        width = optim[2]
-    else:
-        center = optim[4]
-        width = optim[5]
-
-    lower_bound = int(center - width / 2.0)
-    upper_bound = int(center + width / 2.0)
-
-    return lower_bound, upper_bound
 
 
 def find_border_contours(contours, img_h, img_w):
@@ -476,3 +419,57 @@ def elongate_contour(contour, img_shape, extend_length):
                                               cv2.CHAIN_APPROX_SIMPLE)
 
     return contours[0]
+
+
+# from scipy-cookbook:
+# https://scipy-cookbook.readthedocs.io/items/FittingData.html
+def gaussian_2d(height, center_x, center_y, width_x, width_y):
+    """Returns a gaussian function with the given parameters"""
+    width_x = float(width_x)
+    width_y = float(width_y)
+    return lambda x, y: height * np.exp(
+        -(((center_x - x) / width_x) ** 2 + ((center_y - y) / width_y) ** 2) / 2
+    )
+
+
+def _moments_gaussian_2d(data):
+    """
+    Returns (height, x, y, width_x, width_y)
+    the gaussian parameters of a 2D distribution by calculating its
+    moments
+    """
+    total = data.sum()
+    x, y = np.indices(data.shape)
+    x = (x * data).sum() / total
+    y = (y * data).sum() / total
+
+    col = data[:, int(y)]
+    width_x = np.sqrt(
+        np.abs((np.arange(col.size) - y) ** 2 * col).sum() / col.sum()
+    )
+
+    row = data[int(x), :]
+    width_y = np.sqrt(
+        np.abs((np.arange(row.size) - x) ** 2 * row).sum() / row.sum()
+    )
+
+    height = data.max()
+
+    return height, x, y, width_x, width_y
+
+
+def _error_function_gaussian_2d(data):
+    return lambda p: np.ravel(
+        gaussian_2d(*p)(*np.indices(data.shape)) - data
+    )
+
+
+def fit_gaussian_2d(data):
+    """
+    Returns (height, x, y, width_x, width_y)
+    the gaussian parameters of a 2D distribution found by a fit
+    """
+    params = np.array(_moments_gaussian_2d(data))
+    lsq_results = optimize.leastsq(_error_function_gaussian_2d(data), params)
+
+    return lsq_results[0]
