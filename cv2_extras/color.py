@@ -17,6 +17,7 @@ except ImportError:
 # The MIT License (MIT)
 #
 # Copyright (c) 2014 Adrian Rosebrock, http://www.pyimagesearch.com
+# Copyright (c) 2018 Scott White
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -36,12 +37,14 @@ except ImportError:
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 #
-# All other code is distributed
+# ---END LICENSE---
+#
+# All other code is distributed under the cv2_extras project license
 
 
-def color_transfer(source, target, clip=True, preserve_paper=True):
+def color_transfer(ref_img, target_img, clip=True, preserve_paper=True):
     """
-    Transfers the color distribution from the source to the target
+    Transfers the color distribution from the reference to the target
     image using the mean and standard deviations of the L*a*lab_b*
     color space.
 
@@ -50,8 +53,8 @@ def color_transfer(source, target, clip=True, preserve_paper=True):
 
     Parameters:
     -------
-    source: NumPy array
-        OpenCV image in BGR color space (the source image)
+    ref_img: NumPy array
+        OpenCV image in BGR color space (the reference image)
     target: NumPy array
         OpenCV image in BGR color space (the target image)
     clip: Should components of L*a*lab_b* image be scaled by np.clip before
@@ -70,39 +73,39 @@ def color_transfer(source, target, clip=True, preserve_paper=True):
     Returns:
     -------
     transfer: NumPy array
-        OpenCV image (w, h, 3) NumPy array (uint8)
+        OpenCV image (w, h, 3) NumPy array (8-bit unsigned integer)
     """
     # convert the images from the RGB to L*ab* color space, being
     # sure to utilizing the floating point data type (note: OpenCV
     # expects floats to be 32-bit, so use that instead of 64-bit)
-    source = cv2.cvtColor(source, cv2.COLOR_BGR2LAB).astype("float32")
-    target = cv2.cvtColor(target, cv2.COLOR_BGR2LAB).astype("float32")
+    ref_img = cv2.cvtColor(ref_img, cv2.COLOR_BGR2LAB).astype(np.float32)
+    target_img = cv2.cvtColor(target_img, cv2.COLOR_BGR2LAB).astype(np.float32)
 
-    # compute color statistics for the source and target images
-    (lMeanSrc, lStdSrc, aMeanSrc, aStdSrc, bMeanSrc, bStdSrc) = image_stats(source)
-    (lMeanTar, lStdTar, aMeanTar, aStdTar, bMeanTar, bStdTar) = image_stats(target)
+    # compute color statistics for the reference and target images
+    (lMeanRef, lStdRef, aMeanRef, aStdRef, bMeanRef, bStdRef) = image_stats(ref_img)
+    (lMeanTar, lStdTar, aMeanTar, aStdTar, bMeanTar, bStdTar) = image_stats(target_img)
 
     # subtract the means from the target image
-    (light, lab_a, lab_b) = cv2.split(target)
+    (light, lab_a, lab_b) = cv2.split(target_img)
     light -= lMeanTar
     lab_a -= aMeanTar
     lab_b -= bMeanTar
 
     if preserve_paper:
         # scale by the standard deviations using paper proposed factor
-        light = (lStdTar / lStdSrc) * light
-        lab_a = (aStdTar / aStdSrc) * lab_a
-        lab_b = (bStdTar / bStdSrc) * lab_b
+        light = (lStdTar / lStdRef) * light
+        lab_a = (aStdTar / aStdRef) * lab_a
+        lab_b = (bStdTar / bStdRef) * lab_b
     else:
         # scale by the standard deviations using reciprocal of paper proposed factor
-        light = (lStdSrc / lStdTar) * light
-        lab_a = (aStdSrc / aStdTar) * lab_a
-        lab_b = (bStdSrc / bStdTar) * lab_b
+        light = (lStdRef / lStdTar) * light
+        lab_a = (aStdRef / aStdTar) * lab_a
+        lab_b = (bStdRef / bStdTar) * lab_b
 
-    # add in the source mean
-    light += lMeanSrc
-    lab_a += aMeanSrc
-    lab_b += bMeanSrc
+    # add in the reference mean
+    light += lMeanRef
+    lab_a += aMeanRef
+    lab_b += bMeanRef
 
     # clip/scale the pixel intensities to [0, 255] if they fall
     # outside this range
@@ -114,7 +117,7 @@ def color_transfer(source, target, clip=True, preserve_paper=True):
     # space, being sure to utilize the 8-bit unsigned integer data
     # type
     transfer = cv2.merge([light, lab_a, lab_b])
-    transfer = cv2.cvtColor(transfer.astype("uint8"), cv2.COLOR_LAB2BGR)
+    transfer = cv2.cvtColor(transfer.astype(np.uint8), cv2.COLOR_LAB2BGR)
 
     # return the color transferred image
     return transfer
