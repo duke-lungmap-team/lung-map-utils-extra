@@ -55,7 +55,7 @@ def color_transfer(ref_img, target_img, clip=True, preserve_paper=True):
     -------
     ref_img: NumPy array
         OpenCV image in BGR color space (the reference image)
-    target: NumPy array
+    target_img: NumPy array
         OpenCV image in BGR color space (the target image)
     clip: Should components of L*a*lab_b* image be scaled by np.clip before
         converting back to BGR color space?
@@ -82,8 +82,8 @@ def color_transfer(ref_img, target_img, clip=True, preserve_paper=True):
     target_img = cv2.cvtColor(target_img, cv2.COLOR_BGR2LAB).astype(np.float32)
 
     # compute color statistics for the reference and target images
-    (lMeanRef, lStdRef, aMeanRef, aStdRef, bMeanRef, bStdRef) = image_stats(ref_img)
-    (lMeanTar, lStdTar, aMeanTar, aStdTar, bMeanTar, bStdTar) = image_stats(target_img)
+    (lMeanRef, lStdRef, aMeanRef, aStdRef, bMeanRef, bStdRef) = _lab_image_stats(ref_img)
+    (lMeanTar, lStdTar, aMeanTar, aStdTar, bMeanTar, bStdTar) = _lab_image_stats(target_img)
 
     # subtract the means from the target image
     (light, lab_a, lab_b) = cv2.split(target_img)
@@ -123,7 +123,7 @@ def color_transfer(ref_img, target_img, clip=True, preserve_paper=True):
     return transfer
 
 
-def image_stats(image):
+def _lab_image_stats(image):
     """
     Parameters:
     -------
