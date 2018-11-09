@@ -1,5 +1,9 @@
 import numpy as np
-import cv2
+# weird import style to un-confuse PyCharm
+try:
+    from cv2 import cv2
+except ImportError:
+    import cv2
 
 # The functions:
 #  - color_transfer
@@ -38,7 +42,7 @@ import cv2
 def color_transfer(source, target, clip=True, preserve_paper=True):
     """
     Transfers the color distribution from the source to the target
-    image using the mean and standard deviations of the L*a*b*
+    image using the mean and standard deviations of the L*a*lab_b*
     color space.
 
     This implementation is (loosely) based on to the "Color Transfer
@@ -50,16 +54,16 @@ def color_transfer(source, target, clip=True, preserve_paper=True):
         OpenCV image in BGR color space (the source image)
     target: NumPy array
         OpenCV image in BGR color space (the target image)
-    clip: Should components of L*a*b* image be scaled by np.clip before
+    clip: Should components of L*a*lab_b* image be scaled by np.clip before
         converting back to BGR color space?
         If False then components will be min-max scaled appropriately.
         Clipping will keep target image brightness truer to the input.
         Scaling will adjust image brightness to avoid washed out portions
         in the resulting color transfer that can be caused by clipping.
     preserve_paper: Should color transfer strictly follow methodology
-        layed out in original paper? The method does not always produce
+        laid out in original paper? The method does not always produce
         aesthetically pleasing results.
-        If False then L*a*b* components will scaled using the reciprocal of
+        If False then L*a*lab_b* components will scaled using the reciprocal of
         the scaling factor proposed in the paper.  This method seems to produce
         more consistently aesthetically pleasing results
 
@@ -79,37 +83,37 @@ def color_transfer(source, target, clip=True, preserve_paper=True):
     (lMeanTar, lStdTar, aMeanTar, aStdTar, bMeanTar, bStdTar) = image_stats(target)
 
     # subtract the means from the target image
-    (l, a, b) = cv2.split(target)
-    l -= lMeanTar
-    a -= aMeanTar
-    b -= bMeanTar
+    (light, lab_a, lab_b) = cv2.split(target)
+    light -= lMeanTar
+    lab_a -= aMeanTar
+    lab_b -= bMeanTar
 
     if preserve_paper:
         # scale by the standard deviations using paper proposed factor
-        l = (lStdTar / lStdSrc) * l
-        a = (aStdTar / aStdSrc) * a
-        b = (bStdTar / bStdSrc) * b
+        light = (lStdTar / lStdSrc) * light
+        lab_a = (aStdTar / aStdSrc) * lab_a
+        lab_b = (bStdTar / bStdSrc) * lab_b
     else:
         # scale by the standard deviations using reciprocal of paper proposed factor
-        l = (lStdSrc / lStdTar) * l
-        a = (aStdSrc / aStdTar) * a
-        b = (bStdSrc / bStdTar) * b
+        light = (lStdSrc / lStdTar) * light
+        lab_a = (aStdSrc / aStdTar) * lab_a
+        lab_b = (bStdSrc / bStdTar) * lab_b
 
     # add in the source mean
-    l += lMeanSrc
-    a += aMeanSrc
-    b += bMeanSrc
+    light += lMeanSrc
+    lab_a += aMeanSrc
+    lab_b += bMeanSrc
 
     # clip/scale the pixel intensities to [0, 255] if they fall
     # outside this range
-    l = _scale_array(l, clip=clip)
-    a = _scale_array(a, clip=clip)
-    b = _scale_array(b, clip=clip)
+    light = _scale_array(light, clip=clip)
+    lab_a = _scale_array(lab_a, clip=clip)
+    lab_b = _scale_array(lab_b, clip=clip)
 
     # merge the channels together and convert back to the RGB color
     # space, being sure to utilize the 8-bit unsigned integer data
     # type
-    transfer = cv2.merge([l, a, b])
+    transfer = cv2.merge([light, lab_a, lab_b])
     transfer = cv2.cvtColor(transfer.astype("uint8"), cv2.COLOR_LAB2BGR)
 
     # return the color transferred image
@@ -135,7 +139,7 @@ def image_stats(image):
     (bMean, bStd) = (b.mean(), b.std())
 
     # return the color statistics
-    return (lMean, lStd, aMean, aStd, bMean, bStd)
+    return lMean, lStd, aMean, aStd, bMean, bStd
 
 
 def _min_max_scale(arr, new_range=(0, 255)):
