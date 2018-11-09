@@ -473,3 +473,47 @@ def fit_gaussian_2d(data):
     lsq_results = optimize.leastsq(_error_function_gaussian_2d(data), params)
 
     return lsq_results[0]
+
+
+def calculate_nonuniform_field(single_channel):
+    """
+    Calculates the non-uniformity of a 2-D array, most typically used to
+    correct for uneven "lightness" of an image.
+    :param single_channel: Single channel 2-D NumPy array
+    :return: 2-D NumPy array (float64)
+    """
+    # "Elevate" any black pixel values to half the median to better fit
+    # the data. Black pixels provide no details as to the variation of
+    # luminance within an image
+    med = np.median(single_channel[single_channel > 0])
+
+    tmp_img = single_channel.copy()
+    tmp_img[tmp_img <= med / 2.0] = int(med / 2.0)
+
+    params = fit_gaussian_2d(tmp_img)
+    fit = gaussian_2d(*params)
+
+    non_uni_field = fit(*np.indices(tmp_img.shape))
+
+    return non_uni_field
+
+
+def correct_nonuniformity(single_channel, mask=None):
+    if mask is not None:
+        masked_img = cv2.bitwise_and(single_channel, single_channel, mask=mask)
+    else:
+        masked_img = single_channel.copy()
+
+    non_uni_field = calculate_nonuniform_field(masked_img)
+
+    non_uni_field = non_uni_field.round().astype(np.uint8)
+
+    field_corr = ~non_uni_field
+    field_corr -= field_corr.min()
+
+    single_channel_corr = single_channel.copy().astype(np.uint16)
+    single_channel_corr += field_corr
+    single_channel_corr[single_channel_corr > 255] = 255
+    single_channel_corr = single_channel_corr.astype(np.uint8)
+
+    return single_channel_corr
