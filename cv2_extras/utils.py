@@ -184,10 +184,16 @@ def fill_border_contour(contour, img_shape):
 
 def find_border_by_mask(
         signal_mask,
-        contour_mask,
-        max_dilate_percentage=0.2,
-        dilate_iterations=1
+        contour,
+        signal_threshold=0.7,
+        max_dilate_percentage=2.0,
+        spread=9,
+        dilate_iterations=1,
+        plot=False
 ):
+    contour_mask = np.zeros(signal_mask.shape, dtype=np.uint8)
+    cv2.drawContours(contour_mask, [contour], -1, 255, cv2.FILLED)
+
     area = np.sum(contour_mask > 0)
     max_dilation_area = area + int(max_dilate_percentage * area)
 
@@ -200,12 +206,10 @@ def find_border_by_mask(
     border_mask = contour_mask - filled_c_mask_erode
     border_signal_mask = np.bitwise_and(border_mask, signal_mask)
 
-    max_mask = contour_mask.copy()
     max_signal = np.sum(border_signal_mask > 0) / np.sum(border_mask > 0)
-    orig = True
 
     filled_c_mask_dilate = contour_mask.copy()
-
+    signal_profile = [max_signal]
     count = 0
 
     while area < max_dilation_area:
@@ -223,15 +227,84 @@ def find_border_by_mask(
 
         new_signal = np.sum(border_signal_mask > 0) / np.sum(border_mask > 0)
 
+        signal_profile.append(new_signal)
+
         if max_signal > 0 and new_signal == 0 and count > 5:
             break
 
         if new_signal >= max_signal:
             max_signal = new_signal
-            max_mask = filled_c_mask_dilate.copy()
-            orig = False
 
-    return max_mask, max_signal, orig
+    final_dilate_iter = 0
+
+    if max_signal > signal_threshold:
+
+        n = len(signal_profile)
+        x = range(n)
+        min_a = 0
+        max_a = 1
+        min_sigma = 0
+        max_sigma = n / 2
+        max_idx = np.argmax(signal_profile)
+
+        p0 = [1, max_idx, 1]
+        min_mu = max_idx - spread
+        max_mu = max_idx + spread
+
+        if max_idx - spread < 0:
+            low_bound = 0
+        else:
+            low_bound = max_idx - spread
+
+        if max_idx + spread > n:
+            high_bound = n
+        else:
+            high_bound = max_idx + spread
+
+        iso_x = x[low_bound:high_bound]
+        iso_data = signal_profile[low_bound:high_bound]
+
+        popt, pcov = optimize.curve_fit(
+            gauss,
+            iso_x,
+            iso_data,
+            p0=p0,
+            maxfev=50000,
+            bounds=(
+                (min_a, min_mu, min_sigma),
+                (max_a, max_mu, max_sigma)
+            )
+        )
+
+        final_dilate_iter = int(np.round(popt[1] + 1.50 * popt[2]))
+
+        if plot:
+            print(popt)
+            plt.figure(figsize=(16, 4))
+            plt.bar(x, signal_profile)
+            plt.plot(
+                x,
+                gauss(np.array(x), *popt),
+                color='lime',
+                linestyle='--',
+                linewidth=3
+            )
+            plt.axvline(final_dilate_iter, color='k', linewidth=5)
+
+            plt.show()
+
+    if final_dilate_iter > 0:
+        final_mask = cv2.dilate(
+            contour_mask,
+            circle_strel,
+            iterations=final_dilate_iter
+        )
+        orig = False
+    else:
+        final_mask = contour_mask
+        orig = True
+
+    return final_mask, max_signal, orig
 
 
 def find_contour_union(contour_list, img_shape):
@@ -419,6 +492,10 @@ def elongate_contour(contour, img_shape, extend_length):
                                               cv2.CHAIN_APPROX_SIMPLE)
 
     return contours[0]
+
+
+def gauss(x, a, mu, sigma):
+    return a * np.exp(-(x - mu)**2 / (2*sigma**2))
 
 
 # from scipy-cookbook:
