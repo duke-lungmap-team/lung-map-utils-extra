@@ -12,7 +12,7 @@ setup(
         'numpy (>=1.16)',
         'opencv-python (>=4.1)',
         'scipy (>=1.2)',
-        'skimage (>=0.15)',
+        'scikit-image (>=0.15)',
         'matplotlib (>=3.0)'
     ]
 )
