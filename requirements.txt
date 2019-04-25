@@ -1,5 +1,6 @@
-opencv-python
-matplotlib
-numpy
-scikit-image
-scipy
+numpy>=1.16
+opencv-python>=4.1
+scipy>=1.2
+matplotlib>=3.0
+scikit-image>=0.15
+
