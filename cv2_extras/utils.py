@@ -19,20 +19,21 @@ def fill_holes(mask):
     Fills holes in a given binary mask.
     """
     ret, thresh = cv2.threshold(mask, 1, 255, cv2.THRESH_BINARY)
-    new_mask, contours, hierarchy = cv2.findContours(
+    contours, hierarchy = cv2.findContours(
         thresh,
         cv2.RETR_CCOMP,
         cv2.CHAIN_APPROX_SIMPLE
     )
-    for cnt in contours:
-        cv2.drawContours(new_mask, [cnt], 0, 255, -1)
+
+    new_mask = np.zeros(mask.shape, dtype=np.uint8)
+    cv2.drawContours(new_mask, contours, -1, 255, -1)
 
     return new_mask
 
 
 def filter_contours_by_size(mask, min_size=1024, max_size=None):
     ret, thresh = cv2.threshold(mask, 1, 255, cv2.THRESH_BINARY)
-    new_mask, contours, hierarchy = cv2.findContours(
+    contours, hierarchy = cv2.findContours(
         thresh,
         cv2.RETR_EXTERNAL,
         cv2.CHAIN_APPROX_SIMPLE
@@ -351,7 +352,7 @@ def generate_background_contours(
         mask[mask == 1] = 255
         mask = cv2.erode(mask, np.ones((3, 3), np.uint8), iterations=3)
 
-        new_mask, contours, hierarchy = cv2.findContours(
+        contours, hierarchy = cv2.findContours(
             mask,
             cv2.RETR_CCOMP,
             cv2.CHAIN_APPROX_SIMPLE
@@ -488,8 +489,11 @@ def elongate_contour(contour, img_shape, extend_length):
     # fix interpolation artifacts
     c_mask_new[c_mask_new > 0] = 255
 
-    _, contours, hierarchy = cv2.findContours(c_mask_new.copy(), cv2.RETR_EXTERNAL,
-                                              cv2.CHAIN_APPROX_SIMPLE)
+    contours, hierarchy = cv2.findContours(
+        c_mask_new.copy(),
+        cv2.RETR_EXTERNAL,
+        cv2.CHAIN_APPROX_SIMPLE
+    )
 
     return contours[0]
 
