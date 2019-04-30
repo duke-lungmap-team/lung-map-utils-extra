@@ -1,3 +1,4 @@
+import os
 import numpy as np
 from scipy import optimize
 from skimage.segmentation import slic
@@ -9,9 +10,63 @@ try:
 except ImportError:
     import cv2
 
+block_strel = np.ones((3, 3))
 ellipse_strel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
 ellipse90_strel = np.rot90(ellipse_strel)
 circle_strel = np.bitwise_or(ellipse_strel, ellipse90_strel)
+cross_strel = cv2.getStructuringElement(cv2.MORPH_CROSS, (3, 3))
+
+
+def calculate_distance(x1, y1, x2, y2):
+    dist = np.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
+    return dist
+
+
+def get_bounding_rect(contour):
+    b_rect = cv2.boundingRect(contour)
+    x1 = b_rect[0]
+    x2 = b_rect[0] + b_rect[2]
+    y1 = b_rect[1]
+    y2 = b_rect[1] + b_rect[3]
+
+    return x1, y1, x2, y2
+
+
+def crop_image(img, x1, y1, x2, y2):
+
+    # crop region and poly points for efficiency
+    crop_img = img[y1:y2, x1:x2]
+
+    return crop_img
+
+
+def save_image(base_dir, img_name, rgb_img):
+    image_path = os.path.join(
+        base_dir,
+        img_name
+    )
+    cv2.imwrite(
+        image_path,
+        cv2.cvtColor(rgb_img, cv2.COLOR_RGB2BGR)
+    )
+
+
+def get_flat_hsv_channels(hsv_img, mask=None):
+    """
+    Returns flattened hue, saturation, and values from given HSV image.
+    """
+    hue = hsv_img[:, :, 0].flatten()
+    sat = hsv_img[:, :, 1].flatten()
+    val = hsv_img[:, :, 2].flatten()
+
+    if mask is not None:
+        flat_mask = mask.flatten()
+
+        hue = hue[flat_mask > 0]
+        sat = sat[flat_mask > 0]
+        val = val[flat_mask > 0]
+
+    return hue, sat, val
 
 
 def fill_holes(mask):
@@ -29,6 +84,39 @@ def fill_holes(mask):
     cv2.drawContours(new_mask, contours, -1, 255, -1)
 
     return new_mask
+
+
+def plot_contours(img_hsv, contours):
+    new_img = cv2.cvtColor(img_hsv, cv2.COLOR_HSV2RGB)
+    cv2.drawContours(new_img, contours, -1, (0, 255, 0), 5)
+    plt.figure(figsize=(16, 16))
+    plt.imshow(new_img)
+    plt.show()
+
+
+def translate_contour(contour, x, y):
+    if len(contour.shape) == 3:
+        # dealing with OpenCV type contour
+        contour[:, :, 0] = contour[:, :, 0] - x
+        contour[:, :, 1] = contour[:, :, 1] - y
+    else:
+        # assume a simple array of x, y coordinates
+        contour[:, 0] = contour[:, 0] - x
+        contour[:, 1] = contour[:, 1] - y
+
+    return contour
+
+
+def smooth_contours(contours, peri_factor=0.007):
+    smoothed_contours = []
+
+    for c in contours:
+        peri = cv2.arcLength(c, True)
+        smooth_c = cv2.approxPolyDP(c, peri_factor * np.sqrt(peri), True)
+
+        smoothed_contours.append(smooth_c)
+
+    return smoothed_contours
 
 
 def filter_contours_by_size(mask, min_size=1024, max_size=None):
