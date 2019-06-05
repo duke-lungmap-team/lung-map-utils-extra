@@ -329,7 +329,7 @@ def find_border_by_mask(
     if max_signal > signal_threshold:
 
         n = len(signal_profile)
-        x = range(n)
+        x = list(range(n))
         min_a = 0
         max_a = 1
         min_sigma = 0
