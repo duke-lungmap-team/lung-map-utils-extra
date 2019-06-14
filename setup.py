@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='cv2_extras',
-    version='0.5',
+    version='0.5.1',
     packages=['cv2_extras'],
     license='BSD 2-Clause License',
     long_description=open('README.md').read(),

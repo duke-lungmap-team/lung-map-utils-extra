@@ -128,7 +128,7 @@ def filter_contours_by_size(mask, min_size=1024, max_size=None):
     )
 
     if max_size is None:
-        max_size = int(mask.shape[0] * mask.shape[1] * 0.50)
+        max_size = mask.shape[0] * mask.shape[1]
     min_size = min_size
 
     good_contours = []
