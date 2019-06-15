@@ -286,6 +286,9 @@ def find_border_by_mask(
     area = np.sum(contour_mask > 0)
     max_dilation_area = area + int(max_dilate_percentage * area)
 
+    if max_dilation_area > contour_mask.size:
+        max_dilation_area = contour_mask.size
+
     # create a baseline from the original border
     filled_c_mask_erode = cv2.erode(
         contour_mask,
@@ -314,7 +317,10 @@ def find_border_by_mask(
         border_mask = filled_c_mask_dilate - last_mask
         border_signal_mask = np.bitwise_and(border_mask, signal_mask)
 
-        new_signal = np.sum(border_signal_mask > 0) / np.sum(border_mask > 0)
+        if border_mask.max() == 0:
+            new_signal = 0
+        else:
+            new_signal = np.sum(border_signal_mask > 0) / np.sum(border_mask > 0)
 
         signal_profile.append(new_signal)
 
