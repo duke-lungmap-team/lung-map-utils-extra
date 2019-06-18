@@ -416,6 +416,7 @@ def find_contour_union(contour_list, img_shape):
 def generate_background_contours(
         hsv_img,
         non_bg_contours,
+        n_segments=200,
         remove_border_contours=True,
         plot=False
 ):
@@ -427,7 +428,7 @@ def generate_background_contours(
 
     segments = slic(
         bg_mask_img,
-        n_segments=200,  # TODO: need to calculate this instead of hard-coding
+        n_segments=n_segments,
         compactness=100,
         sigma=1,
         enforce_connectivity=True
