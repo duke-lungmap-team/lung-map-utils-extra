@@ -278,7 +278,8 @@ def find_border_by_mask(
         max_dilate_percentage=2.0,
         spread=9,
         dilate_iterations=1,
-        plot=False
+        plot=False,
+        figsize=(16, 4)
 ):
     contour_mask = np.zeros(signal_mask.shape, dtype=np.uint8)
     cv2.drawContours(contour_mask, [contour], -1, 255, cv2.FILLED)
@@ -375,7 +376,7 @@ def find_border_by_mask(
 
         if plot:
             print(popt)
-            plt.figure(figsize=(16, 4))
+            plt.figure(figsize=figsize)
             plt.bar(x, signal_profile)
             plt.plot(
                 x,
